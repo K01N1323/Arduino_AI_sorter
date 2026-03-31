@@ -34,7 +34,7 @@ void loop() {
   Serial.print("Center pixel color: 0x");
   Serial.println(centerPixel, HEX);
 
-  // Вычисляем яркость (простое усреднение для начала)
+  // Вычисляем яркость gi(простое усреднение для начала)
   // RGB565 -> Brightness
   uint16_t r = (centerPixel >> 11) & 0x1F; // Извлекаем 5 бит красного
   uint16_t g = (centerPixel >> 5) & 0x3F;  // Извлекаем 6 бит зеленого
