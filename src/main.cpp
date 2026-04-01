@@ -3,53 +3,69 @@
 
 OV767X camera;
 
-// Выделяем память под ВЕСЬ кадр (160 * 120)
-// Используем ключевое слово static, чтобы массив лежал в области данных, а не в
-// стеке
-static uint16_t frameBuffer[160 * 120];
+static uint16_t Buffer[160 * 120];
 
 void setup() {
   Serial.begin(115200);
+
   while (!Serial)
     ;
 
   if (!camera.begin(QQVGA, RGB565, 1)) {
-    Serial.println("ERR: Camera failed");
+    Serial.println("Инициация камеры ......");
     while (1)
       ;
   }
-  Serial.println("SUCCESS: Camera is ready.");
+
+  Serial.println("Все необходимые объекты инициализированны. Переходим к "
+                 "выполнению алгоритма......");
 }
 
 void loop() {
-  Serial.println(">>> Requesting frame...");
+  Serial.println("Делаем фото....");
+  camera.readFrame((uint8_t *)Buffer);
+  Serial.println("Фото сделано");
 
-  // Теперь у нас буфер нужного размера!
-  camera.readFrame((uint8_t *)frameBuffer);
+  long sumX = 0;
+  long sumY = 0;
+  int count = 0;
 
-  Serial.println(">>> Frame captured successfully!");
+  static float FilteredX = 80;
+  static float FilteredY = 60;
+  float alfa = 0.2;
 
-  // Выведем один пиксель из самого центра для проверки
-  uint16_t centerPixel = frameBuffer[160 * 60 + 80];
-  Serial.print("Center pixel color: 0x");
-  Serial.println(centerPixel, HEX);
+  Serial.println("Все параметры инициализированы");
 
-  // Вычисляем яркость gi(простое усреднение для начала)
-  // RGB565 -> Brightness
-  uint16_t r = (centerPixel >> 11) & 0x1F; // Извлекаем 5 бит красного
-  uint16_t g = (centerPixel >> 5) & 0x3F;  // Извлекаем 6 бит зеленого
-  uint16_t b = centerPixel & 0x1F;         // Извлекаем 5 бит синего
+  for (int y = 0; y < 120; y++) {
+    for (int x = 0; x < 160; x++) {
+      uint16_t pixel = Buffer[160 * y + x];
 
-  // Приводим к общему знаменателю (0-255)
-  float brightness = (r * 8 + g * 4 + b * 8) / 3.0;
+      int r = ((pixel >> 11) & 0x1F) * 8;
+      int g = ((pixel >> 5) & 0x3F) * 4;
+      int b = (pixel & 0x1F) * 8;
 
-  Serial.print("Current Brightness: ");
-  Serial.println(brightness);
+      if ((r > 1.2 * g) && (r > 1.2 * b) && (r > 100)) {
+        count++;
+        sumX += x;
+        sumY += y;
+      }
+    }
+  }
 
-  if (brightness < 50) {
-    Serial.println("Status: TOO DARK");
+  if (count < 5) {
+    Serial.println("Красного объекта нет в кадре.....");
   } else {
-    Serial.println("Status: LIGHT OK");
+
+    int avgX = sumX / count;
+    int avgY = sumY / count;
+
+    FilteredX = avgX * alfa + (1 - alfa) * FilteredX;
+    FilteredY = avgY * alfa + (1 - alfa) * FilteredY;
+
+    Serial.print("Filtered X: ");
+    Serial.print((int)FilteredX);
+    Serial.print(" | Filtered Y: ");
+    Serial.println((int)FilteredY);
   }
 
   delay(2000);
